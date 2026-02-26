@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cps-postgres
+    environment:
+      POSTGRES_DB: checkprint
+      POSTGRES_USER: cps_user
+      POSTGRES_PASSWORD: cps_secret_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cps_user -d checkprint"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    container_name: cps-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cps_user:cps_secret_password@postgres:5432/checkprint
+      SECRET_KEY: change-this-to-a-real-secret-key-in-production
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata:
